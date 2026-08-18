@@ -23,7 +23,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_allowed_origins,
-    allow_credentials=True,
+    # Auth here is a Bearer token in the Authorization header, not cookies,
+    # so allow_credentials (which governs cookie/TLS-cert cross-origin
+    # sharing) isn't needed — and CORS disallows it alongside a wildcard
+    # origin anyway. Leave this False as long as CORS_ALLOWED_ORIGINS
+    # includes "*" (see .env.example).
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

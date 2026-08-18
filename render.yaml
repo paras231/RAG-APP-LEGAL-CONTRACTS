@@ -41,10 +41,11 @@ services:
       - key: ANSWER_CACHE_TTL
         value: "3600"
 
-      # Update this to your deployed Netlify origin before going live —
-      # see netlify.toml / the frontend deploy steps in the README.
+      # Wide open for now (fine — auth is a Bearer token, not cookies).
+      # Tighten this to your deployed Netlify origin once it's known, e.g.
+      # '["https://your-app.netlify.app"]' — see netlify.toml.
       - key: CORS_ALLOWED_ORIGINS
-        value: '["https://your-app.netlify.app"]'
+        value: '["*"]'
 
       - key: DATABASE_SSL
         value: "true"
