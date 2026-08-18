@@ -1,8 +1,11 @@
-import { ArrowUp, Square } from "lucide-react";
+import { AlertCircle, ArrowUp, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+const MAX_LENGTH = 4000;
 
 export default function Composer({ onSend, isSending, onStop, disabled, disabledHint }) {
   const [value, setValue] = useState("");
+  const [error, setError] = useState(null);
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -14,8 +17,14 @@ export default function Composer({ onSend, isSending, onStop, disabled, disabled
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isSending || disabled) return;
     const trimmed = value.trim();
-    if (!trimmed || isSending || disabled) return;
+    if (!trimmed) return;
+    if (trimmed.length > MAX_LENGTH) {
+      setError(`Message is too long (${trimmed.length}/${MAX_LENGTH} characters).`);
+      return;
+    }
+    setError(null);
     onSend(trimmed);
     setValue("");
   };
@@ -47,11 +56,15 @@ export default function Composer({ onSend, isSending, onStop, disabled, disabled
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (error) setError(null);
+          }}
           onKeyDown={handleKeyDown}
           rows={1}
-          placeholder="Ask a question about your documents…"
+          placeholder="Ask a question about your notes…"
           disabled={disabled}
+          aria-invalid={Boolean(error)}
           className="max-h-[200px] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         {isSending ? (
@@ -71,23 +84,30 @@ export default function Composer({ onSend, isSending, onStop, disabled, disabled
           <button
             type="submit"
             disabled={!value.trim() || disabled}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-accent-contrast)",
-            }}
+            className="brand-gradient flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40"
+            style={{ color: "var(--color-accent-contrast)" }}
             aria-label="Send message"
           >
             <ArrowUp size={18} />
           </button>
         )}
       </div>
-      <p
-        className="mt-2 px-1 text-center text-xs"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        Counsel can make mistakes. Verify important information against source documents.
-      </p>
+      {error ? (
+        <p
+          className="mt-2 flex items-center justify-center gap-1.5 px-1 text-center text-xs"
+          style={{ color: "var(--color-danger)" }}
+        >
+          <AlertCircle size={13} />
+          {error}
+        </p>
+      ) : (
+        <p
+          className="mt-2 px-1 text-center text-xs"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          StudyMate can make mistakes. Verify important information against your notes.
+        </p>
+      )}
     </form>
   );
 }

@@ -1,4 +1,4 @@
-import { AlertTriangle, BookText, Scale, User } from "lucide-react";
+import { AlertTriangle, BookText, GraduationCap, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import clsx from "clsx";
@@ -31,25 +31,26 @@ export default function MessageBubble({ message }) {
       )}
     >
       <div
-        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+        className={clsx(
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
+          !isUser && "brand-gradient",
+        )}
         style={{
-          backgroundColor: isUser ? "var(--color-surface)" : "var(--color-accent)",
+          backgroundColor: isUser ? "var(--color-surface)" : undefined,
           color: isUser ? "var(--color-text)" : "var(--color-accent-contrast)",
         }}
       >
-        {isUser ? <User size={16} /> : <Scale size={16} />}
+        {isUser ? <User size={16} /> : <GraduationCap size={16} />}
       </div>
 
       <div className={clsx("flex max-w-[85%] flex-col gap-1.5 sm:max-w-[75%]", isUser && "items-end")}>
         <div
           className={clsx(
             "rounded-2xl px-4 py-2.5 text-[0.925rem] leading-relaxed",
-            isUser ? "rounded-tr-sm" : "rounded-tl-sm",
+            isUser ? "brand-gradient rounded-tr-sm" : "rounded-tl-sm",
           )}
           style={{
-            backgroundColor: isUser
-              ? "var(--color-accent)"
-              : "var(--color-surface)",
+            backgroundColor: isUser ? undefined : "var(--color-surface)",
             color: isUser ? "var(--color-accent-contrast)" : "var(--color-text)",
           }}
         >

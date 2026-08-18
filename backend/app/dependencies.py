@@ -13,7 +13,8 @@ from app.core.interfaces import BaseEmbedder, BaseLLM
 from app.db.session import get_session
 from app.embeddings.hf_embedder import HuggingFaceEmbedder
 from app.generation.rag_service import RagService
-from app.ingestion.chunking.legal_chunker import LegalStructureChunker
+from app.generation.study_tools_service import StudyToolsService
+from app.ingestion.chunking.study_chunker import StudyNotesChunker
 from app.ingestion.parsers.registry import ParserRegistry
 from app.ingestion.pipeline import IngestionService
 from app.llm.ollama_llm import OllamaCloudLLM
@@ -74,7 +75,7 @@ def get_ingestion_service(
     vector_store: PgVectorStore = Depends(get_vector_store),
     settings: Settings = Depends(get_settings),
 ) -> IngestionService:
-    chunker = LegalStructureChunker(
+    chunker = StudyNotesChunker(
         chunk_token_size=settings.chunk_token_size,
         chunk_token_overlap=settings.chunk_token_overlap,
     )
@@ -100,3 +101,10 @@ def get_rag_service(
         answer_cache=answer_cache,
         answer_cache_ttl=settings.answer_cache_ttl,
     )
+
+
+def get_study_tools_service(
+    session: AsyncSession = Depends(get_session),
+    llm: BaseLLM = Depends(get_llm),
+) -> StudyToolsService:
+    return StudyToolsService(session=session, llm=llm)

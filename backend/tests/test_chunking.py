@@ -1,33 +1,37 @@
 from app.core.interfaces import ParsedDocument
-from app.ingestion.chunking.legal_chunker import LegalStructureChunker
+from app.ingestion.chunking.study_chunker import StudyNotesChunker
 
-SAMPLE_CONTRACT = """
-ARTICLE 1: DEFINITIONS
+SAMPLE_NOTES = """
+# Chapter 1: Cell Biology
 
-Section 1.1 "Agreement" means this contract between the parties.
-Section 1.2 "Effective Date" means the date first written above.
+## Cell Structure
+A cell is the basic unit of life. It contains organelles such as the nucleus and mitochondria.
 
-ARTICLE 2: OBLIGATIONS
+## Cell Division
+Mitosis produces two identical daughter cells.
 
-Section 2.1 The Contractor shall perform the services described in Exhibit A.
+# Chapter 2: Genetics
+
+## DNA
+DNA carries genetic information encoded in nucleotide sequences.
 """.strip()
 
 
-def test_chunker_splits_on_structure():
-    chunker = LegalStructureChunker(chunk_token_size=500, chunk_token_overlap=50)
-    doc = ParsedDocument(text=SAMPLE_CONTRACT, pages=[SAMPLE_CONTRACT], metadata={})
+def test_chunker_splits_on_headings():
+    chunker = StudyNotesChunker(chunk_token_size=500, chunk_token_overlap=50)
+    doc = ParsedDocument(text=SAMPLE_NOTES, pages=[SAMPLE_NOTES], metadata={})
 
     chunks = chunker.chunk(doc, document_metadata={"document_id": "doc-1"})
 
     assert len(chunks) >= 2
     headings = [c.metadata["heading_path"] for c in chunks]
-    assert any("Article 1" in h or "ARTICLE 1" in h for h in headings)
+    assert any("Chapter 1" in h and "Cell Structure" in h for h in headings)
     assert all(c.metadata["document_id"] == "doc-1" for c in chunks)
 
 
 def test_chunker_falls_back_when_no_structure():
-    text = "This is a plain paragraph with no legal structure markers at all. " * 5
-    chunker = LegalStructureChunker(chunk_token_size=500, chunk_token_overlap=50)
+    text = "This is a plain paragraph with no heading markers at all. " * 5
+    chunker = StudyNotesChunker(chunk_token_size=500, chunk_token_overlap=50)
     doc = ParsedDocument(text=text, pages=[text], metadata={})
 
     chunks = chunker.chunk(doc, document_metadata={"document_id": "doc-2"})
@@ -37,11 +41,11 @@ def test_chunker_falls_back_when_no_structure():
 
 
 def test_oversized_section_is_recursively_split():
-    long_section = "Section 5.1 " + ("This clause has a lot of repeated text. " * 200)
-    chunker = LegalStructureChunker(chunk_token_size=50, chunk_token_overlap=10)
+    long_section = "## Big Topic\n" + ("This paragraph has a lot of repeated text. " * 200)
+    chunker = StudyNotesChunker(chunk_token_size=50, chunk_token_overlap=10)
     doc = ParsedDocument(text=long_section, pages=[long_section], metadata={})
 
     chunks = chunker.chunk(doc, document_metadata={"document_id": "doc-3"})
 
     assert len(chunks) > 1
-    assert all(c.metadata["heading_path"] for c in chunks)
+    assert all(c.metadata["heading_path"] == "Big Topic" for c in chunks)

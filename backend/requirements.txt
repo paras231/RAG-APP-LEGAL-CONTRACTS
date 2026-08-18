@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 python-multipart
 pydantic
+pydantic[email]
 pydantic-settings
 langchain-text-splitters
 langgraph
@@ -16,5 +17,8 @@ python-docx
 tiktoken
 numpy
 httpx
+passlib[bcrypt]
+bcrypt==4.0.1
+python-jose[cryptography]
 pytest
 pytest-asyncio

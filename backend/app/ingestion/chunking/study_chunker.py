@@ -1,11 +1,12 @@
-"""Structure-aware chunker for legal documents.
+"""Structure-aware chunker for student notes.
 
-Strategy: first split on legal structural markers (ARTICLE / SECTION /
-numbered clauses) so each chunk stays within one clause's semantic
-boundary and carries a heading path (e.g. "Article 3 > Section 3.2") in
+Strategy: split on Markdown-style heading markers ("#".."######") that the
+parsers (docx_parser.py, pdf_parser.py) emit for detected headings/styles,
+so each chunk carries a heading path (e.g. "Chapter 2 > Photosynthesis") in
 its metadata for citation. Any resulting section that still exceeds the
-token budget is recursively split with overlap so no chunk blows past
-the embedding model's context window.
+token budget is recursively split with overlap, same as the previous legal
+chunker. Notes with no detected headings fall through to a single
+"section" that gets token-budget split directly.
 """
 
 import re
@@ -16,18 +17,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.ingestion.chunking.base import BaseChunker, Chunk, ParsedDocument
 
-# Matches top-level and second-level legal structure headings at the start of a line.
-_STRUCTURE_PATTERN = re.compile(
-    r"^\s*("
-    r"ARTICLE\s+[IVXLCDM\d]+[.:]?.*|"
-    r"SECTION\s+\d+(\.\d+)*[.:]?.*|"
-    r"Section\s+\d+(\.\d+)*[.:]?.*|"
-    r"Clause\s+\d+(\.\d+)*[.:]?.*|"
-    r"\d+\.\d+(\.\d+)*\s+.*|"
-    r"\(\w{1,4}\)\s+.*"
-    r")\s*$",
-    re.MULTILINE,
-)
+_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
 
 _encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -39,10 +29,11 @@ def _token_len(text: str) -> int:
 @dataclass
 class _Section:
     heading: str
+    level: int
     text: str
 
 
-class LegalStructureChunker(BaseChunker):
+class StudyNotesChunker(BaseChunker):
     def __init__(self, chunk_token_size: int = 500, chunk_token_overlap: int = 50):
         self._token_size = chunk_token_size
         self._token_overlap = chunk_token_overlap
@@ -54,37 +45,46 @@ class LegalStructureChunker(BaseChunker):
         )
 
     def _split_into_sections(self, text: str) -> list[_Section]:
-        matches = list(_STRUCTURE_PATTERN.finditer(text))
+        matches = list(_HEADING_PATTERN.finditer(text))
         if not matches:
-            return [_Section(heading="", text=text)]
+            return [_Section(heading="", level=0, text=text)]
 
         sections: list[_Section] = []
         if matches[0].start() > 0:
             preamble = text[: matches[0].start()].strip()
             if preamble:
-                sections.append(_Section(heading="Preamble", text=preamble))
+                sections.append(_Section(heading="", level=0, text=preamble))
 
         for i, match in enumerate(matches):
             start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            section_text = text[start:end].strip()
-            heading = match.group(1).strip()
-            if section_text:
-                sections.append(_Section(heading=heading, text=section_text))
+            body_start = match.end()
+            section_text = text[body_start:end].strip()
+            heading = match.group(2).strip()
+            level = len(match.group(1))
+            content = f"{heading}\n{section_text}".strip() if section_text else heading
+            sections.append(_Section(heading=heading, level=level, text=content))
 
         return sections
 
     def _build_heading_path(self, sections: list[_Section], index: int) -> str:
-        """Best-effort heading path: current section's own heading, prefixed by
-        the most recent ARTICLE-level heading if this section is a subordinate
-        Section/Clause."""
-        heading = sections[index].heading
-        if heading.upper().startswith("ARTICLE") or not heading:
-            return heading
+        """Heading path: current section's heading prefixed by the nearest
+        preceding heading of a shallower level (e.g. an H2 under an H1)."""
+        current = sections[index]
+        if not current.heading:
+            return ""
+        path = [current.heading]
+        level = current.level
         for j in range(index - 1, -1, -1):
-            if sections[j].heading.upper().startswith("ARTICLE"):
-                return f"{sections[j].heading} > {heading}"
-        return heading
+            candidate = sections[j]
+            if not candidate.heading:
+                continue
+            if candidate.level < level:
+                path.insert(0, candidate.heading)
+                level = candidate.level
+            if level <= 1:
+                break
+        return " > ".join(path)
 
     def chunk(self, document: ParsedDocument, document_metadata: dict) -> list[Chunk]:
         sections = self._split_into_sections(document.text)

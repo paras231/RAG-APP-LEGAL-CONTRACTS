@@ -1,93 +1,94 @@
 import { useCallback, useEffect, useState } from "react";
-import { createChat, deriveTitle, loadChats, saveChats } from "../lib/storage";
+import * as api from "../lib/api.js";
+
+function toUiMessage(message) {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    sources: message.sources ?? [],
+    status: "done",
+  };
+}
 
 export function useChats() {
-  const [chats, setChats] = useState(loadChats);
-  const [activeChatId, setActiveChatId] = useState(
-    () => loadChats()[0]?.id ?? null,
-  );
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
-  useEffect(() => {
-    saveChats(chats);
-  }, [chats]);
-
-  const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
-
-  const newChat = useCallback(() => {
-    const chat = createChat();
-    setChats((prev) => [chat, ...prev]);
-    return chat.id;
+  const refreshChats = useCallback(async () => {
+    try {
+      setChats(await api.listChats());
+    } catch {
+      setChats([]);
+    }
   }, []);
 
-  const deleteChat = useCallback(
-    (id) => {
-      setChats((prev) => prev.filter((c) => c.id !== id));
-      if (activeChatId === id) setActiveChatId(null);
-    },
-    [activeChatId],
-  );
+  useEffect(() => {
+    refreshChats();
+  }, [refreshChats]);
 
-  const clearAllChats = useCallback(() => {
-    setChats([]);
+  useEffect(() => {
+    if (!activeChatId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setMessagesLoading(true);
+    api
+      .getChat(activeChatId)
+      .then((chat) => {
+        if (!cancelled) setMessages(chat.messages.map(toUiMessage));
+      })
+      .catch(() => {
+        if (!cancelled) setMessages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setMessagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChatId]);
+
+  const newChat = useCallback(() => {
     setActiveChatId(null);
+    setMessages([]);
+  }, []);
+
+  const deleteChat = useCallback((id) => {
+    setChats((prev) => prev.filter((c) => c.id !== id));
+    api.deleteChat(id).catch(() => {});
   }, []);
 
   const renameChat = useCallback((id, title) => {
-    setChats((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, title } : c)),
-    );
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
+    api.renameChat(id, title).catch(() => {});
   }, []);
 
-  const appendMessage = useCallback((chatId, message) => {
-    setChats((prev) =>
-      prev.map((c) => {
-        if (c.id !== chatId) return c;
-        const isFirstUserMessage =
-          c.messages.length === 0 && message.role === "user";
-        return {
-          ...c,
-          title: isFirstUserMessage ? deriveTitle(message.content) : c.title,
-          messages: [...c.messages, message],
-          updatedAt: Date.now(),
-        };
-      }),
-    );
+  const appendMessage = useCallback((message) => {
+    setMessages((prev) => [...prev, message]);
   }, []);
 
-  const setChatDocument = useCallback((chatId, documentId, documentLabel) => {
-    setChats((prev) =>
-      prev.map((c) =>
-        c.id === chatId ? { ...c, documentId, documentLabel } : c,
-      ),
-    );
+  const updateMessage = useCallback((messageId, patch) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...patch } : m)));
   }, []);
 
-  const updateMessage = useCallback((chatId, messageId, patch) => {
-    setChats((prev) =>
-      prev.map((c) => {
-        if (c.id !== chatId) return c;
-        return {
-          ...c,
-          messages: c.messages.map((m) =>
-            m.id === messageId ? { ...m, ...patch } : m,
-          ),
-          updatedAt: Date.now(),
-        };
-      }),
-    );
-  }, []);
+  const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
 
   return {
     chats,
     activeChat,
     activeChatId,
     setActiveChatId,
+    messages,
+    messagesLoading,
     newChat,
     deleteChat,
-    clearAllChats,
     renameChat,
-    setChatDocument,
     appendMessage,
     updateMessage,
+    refreshChats,
   };
 }

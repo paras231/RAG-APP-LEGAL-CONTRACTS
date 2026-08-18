@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 const ThemeContext = createContext(null);
 
-const STORAGE_KEY = "legal-rag:theme";
+const STORAGE_KEY = "studymate:theme";
 
 function getInitialTheme() {
   const stored = localStorage.getItem(STORAGE_KEY);

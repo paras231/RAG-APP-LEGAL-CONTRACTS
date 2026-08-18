@@ -21,9 +21,14 @@ class Settings(BaseSettings):
     # Postgres
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-    postgres_db: str = "legal_rag"
+    postgres_db: str = "study_rag"
     postgres_user: str = "postgres"
     postgres_password: str = "postgres"
+
+    # Auth
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24 * 7
 
     # Chunking
     chunk_token_size: int = 500

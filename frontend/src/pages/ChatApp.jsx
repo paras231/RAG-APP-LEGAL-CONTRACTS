@@ -1,3 +1,4 @@
+import { GraduationCap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Composer from "../components/Composer.jsx";
@@ -6,7 +7,9 @@ import DocumentPicker from "../components/DocumentPicker.jsx";
 import DocumentsPanel from "../components/DocumentsPanel.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import MessageBubble from "../components/MessageBubble.jsx";
+import SaveProgressDialog from "../components/SaveProgressDialog.jsx";
 import Sidebar, { SidebarToggleButton } from "../components/Sidebar.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { useChats } from "../hooks/useChats.js";
 import { listDocuments, sendChatMessage } from "../lib/api.js";
 
@@ -16,15 +19,20 @@ export default function ChatApp() {
     activeChat,
     activeChatId,
     setActiveChatId,
+    messages,
+    messagesLoading,
     newChat,
     deleteChat,
-    setChatDocument,
     appendMessage,
     updateMessage,
+    refreshChats,
   } = useChats();
+  const { user, isSavePromptOpen, promptSaveProgress, dismissSavePrompt } = useAuth();
 
   const { chatId } = useParams();
   const navigate = useNavigate();
+  const hasPromptedGuestRef = useRef(false);
+  const docDefaultedForChatRef = useRef("__uninitialized__");
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
@@ -32,31 +40,44 @@ export default function ChatApp() {
   const [documentsLoaded, setDocumentsLoaded] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null);
+  const [selectedDocumentLabel, setSelectedDocumentLabel] = useState(null);
   const abortRef = useRef(null);
   const scrollRef = useRef(null);
 
   const hasDocuments = documentsLoaded ? documents.length > 0 : null;
+  const canChat = hasDocuments === true && Boolean(selectedDocumentId);
 
-  // The URL is the single source of truth for which chat is active: reading
-  // the :chatId param into state here, and always navigating (never calling
-  // setActiveChatId directly) elsewhere, avoids the two effects fighting
-  // over activeChatId and flashing back to the previous chat.
+  // The URL is the single source of truth for which chat is active.
   useEffect(() => {
     if (chatId !== activeChatId) setActiveChatId(chatId ?? null);
   }, [chatId, activeChatId, setActiveChatId]);
 
-  // On first load at /app with no :chatId, reflect the most recent chat
-  // (restored from localStorage) in the URL, once.
+  // A document pin is a per-visit convenience, not persisted server-side.
+  // Default it once per chat, after both the document list and this chat's
+  // messages have loaded: reuse the document the chat's last answer was
+  // grounded in if there is one, otherwise fall back to the most recently
+  // uploaded document. Never re-runs mid-chat, so it won't clobber a
+  // manual pick the user makes while sending messages.
   useEffect(() => {
-    if (!chatId && activeChatId) {
-      navigate(`/app/${activeChatId}`, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!documentsLoaded || messagesLoading) return;
+    if (docDefaultedForChatRef.current === chatId) return;
+    docDefaultedForChatRef.current = chatId;
 
-  // Stable identity: passed to DocumentsPanel as a prop and used as a
-  // dependency inside it, so an inline arrow here would give it a new
-  // reference every render and retrigger its fetch effect in a loop.
+    if (documents.length === 0) {
+      setSelectedDocumentId(null);
+      setSelectedDocumentLabel(null);
+      return;
+    }
+
+    const lastSourceDocId = [...messages]
+      .reverse()
+      .find((m) => m.sources?.length > 0)?.sources[0]?.document_id;
+    const defaultDoc = documents.find((d) => d.id === lastSourceDocId) ?? documents[0];
+    setSelectedDocumentId(defaultDoc.id);
+    setSelectedDocumentLabel(defaultDoc.filename);
+  }, [chatId, documentsLoaded, messagesLoading, documents, messages]);
+
   const handleDocumentsChanged = useCallback((docs) => {
     setDocuments(docs);
     setDocumentsLoaded(true);
@@ -73,7 +94,7 @@ export default function ChatApp() {
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [activeChat?.messages.length]);
+  }, [messages.length]);
 
   const handleSelectChat = (id) => {
     navigate(`/app/${id}`);
@@ -81,50 +102,43 @@ export default function ChatApp() {
   };
 
   const handleNewChat = useCallback(() => {
-    const id = newChat();
-    navigate(`/app/${id}`);
+    newChat();
+    navigate("/app");
     setIsSidebarOpen(false);
   }, [newChat, navigate]);
 
   const handleSend = useCallback(
     async (text) => {
-      let targetChatId = activeChatId;
-      let targetChat = activeChat;
-      if (!targetChatId) {
-        targetChatId = newChat();
-        targetChat = null;
-        navigate(`/app/${targetChatId}`);
-      }
-
-      const userMessage = { id: crypto.randomUUID(), role: "user", content: text };
-      appendMessage(targetChatId, userMessage);
+      const userMessage = { id: crypto.randomUUID(), role: "user", content: text, status: "done" };
+      appendMessage(userMessage);
 
       const assistantId = crypto.randomUUID();
-      appendMessage(targetChatId, {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        status: "pending",
-      });
+      appendMessage({ id: assistantId, role: "assistant", content: "", status: "pending" });
 
       setIsSending(true);
       abortRef.current = new AbortController();
 
-      const filters = targetChat?.documentId
-        ? { document_id: targetChat.documentId }
-        : null;
+      const filters = selectedDocumentId ? { document_id: selectedDocumentId } : null;
 
       try {
-        const result = await sendChatMessage(text, filters, abortRef.current.signal);
-        updateMessage(targetChatId, assistantId, {
+        const result = await sendChatMessage(text, activeChatId, filters, abortRef.current.signal);
+        updateMessage(assistantId, {
           content: result.answer,
           model: result.model,
           cached: result.cached,
           sources: result.sources ?? [],
           status: "done",
         });
+        if (!activeChatId) {
+          navigate(`/app/${result.chat_id}`, { replace: true });
+        }
+        refreshChats();
+        if (user?.is_guest && !hasPromptedGuestRef.current) {
+          hasPromptedGuestRef.current = true;
+          promptSaveProgress();
+        }
       } catch (err) {
-        updateMessage(targetChatId, assistantId, {
+        updateMessage(assistantId, {
           content:
             err.name === "AbortError"
               ? "Stopped."
@@ -136,7 +150,16 @@ export default function ChatApp() {
         abortRef.current = null;
       }
     },
-    [activeChat, activeChatId, appendMessage, navigate, newChat, updateMessage],
+    [
+      activeChatId,
+      appendMessage,
+      navigate,
+      promptSaveProgress,
+      refreshChats,
+      selectedDocumentId,
+      updateMessage,
+      user,
+    ],
   );
 
   const handleStop = () => {
@@ -178,28 +201,38 @@ export default function ChatApp() {
           </h1>
           <DocumentPicker
             documents={documents}
-            selectedId={activeChat?.documentId ?? null}
+            selectedId={selectedDocumentId}
             onSelect={(id, label) => {
-              let targetChatId = activeChatId;
-              if (!targetChatId) {
-                targetChatId = newChat();
-                navigate(`/app/${targetChatId}`);
-              }
-              setChatDocument(targetChatId, id, label);
+              setSelectedDocumentId(id);
+              setSelectedDocumentLabel(label);
             }}
           />
+          {selectedDocumentId && (
+            <button
+              type="button"
+              onClick={() => navigate(`/app/study/${selectedDocumentId}`)}
+              className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-surface)] sm:px-2.5"
+              style={{ borderColor: "var(--color-border)" }}
+              aria-label={`Study tools for ${selectedDocumentLabel}`}
+              title={`Study tools for ${selectedDocumentLabel}`}
+            >
+              <GraduationCap size={13} />
+              <span className="hidden sm:inline">Study tools</span>
+            </button>
+          )}
         </header>
 
         <main ref={scrollRef} className="flex-1 overflow-y-auto">
-          {!activeChat || activeChat.messages.length === 0 ? (
+          {messages.length === 0 ? (
             <EmptyState
               hasDocuments={hasDocuments !== false}
+              hasSelectedDocument={Boolean(selectedDocumentId)}
               onOpenDocuments={() => setIsDocumentsOpen(true)}
-              onSuggestion={handleSend}
+              onSuggestion={canChat ? handleSend : undefined}
             />
           ) : (
             <div className="mx-auto max-w-3xl pb-4">
-              {activeChat.messages.map((message) => (
+              {messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
               ))}
             </div>
@@ -210,11 +243,13 @@ export default function ChatApp() {
           onSend={handleSend}
           isSending={isSending}
           onStop={handleStop}
-          disabled={hasDocuments === false}
+          disabled={!canChat}
           disabledHint={
             hasDocuments === false
               ? "Upload a document before asking a question."
-              : null
+              : !selectedDocumentId
+                ? "Select a document above before asking a question."
+                : null
           }
         />
       </div>
@@ -228,11 +263,13 @@ export default function ChatApp() {
       <ConfirmDialog
         open={Boolean(pendingDeleteId)}
         title="Delete chat?"
-        description="This chat and its messages will be permanently removed from this browser."
+        description="This chat and its messages will be permanently deleted."
         confirmLabel="Delete"
         onConfirm={confirmDeleteChat}
         onCancel={() => setPendingDeleteId(null)}
       />
+
+      <SaveProgressDialog open={isSavePromptOpen} onClose={dismissSavePrompt} />
     </div>
   );
 }

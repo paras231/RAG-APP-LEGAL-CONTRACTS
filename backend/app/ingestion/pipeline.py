@@ -28,11 +28,14 @@ class IngestionService:
         self._embedder = embedder
         self._vector_store = vector_store
 
-    async def ingest(self, file_bytes: bytes, filename: str, doc_type: str = "unknown") -> str:
+    async def ingest(
+        self, file_bytes: bytes, filename: str, user_id: str, doc_type: str = "unknown"
+    ) -> str:
         parsed = self._parsers.parse(file_bytes, filename)
 
         document = Document(
             id=uuid.uuid4(),
+            user_id=user_id,
             filename=filename,
             doc_type=doc_type,
             uploaded_at=datetime.now(timezone.utc),
@@ -47,6 +50,7 @@ class IngestionService:
             "document_id": document_id,
             "doc_type": doc_type,
             "filename": filename,
+            "user_id": str(user_id),
         }
         chunks: list[Chunk] = self._chunker.chunk(parsed, document_metadata)
         if not chunks:

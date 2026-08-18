@@ -2,12 +2,14 @@ import {
   AlertCircle,
   CheckCircle2,
   File as FileIcon,
+  GraduationCap,
   Loader2,
   Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { deleteDocument, listDocuments, uploadDocument } from "../lib/api.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 
@@ -16,10 +18,10 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB client-side guard
 
 const DOC_TYPES = [
   { value: "unknown", label: "Unspecified" },
-  { value: "contract", label: "Contract" },
-  { value: "statute", label: "Statute" },
-  { value: "case_law", label: "Case law" },
-  { value: "policy", label: "Policy" },
+  { value: "lecture_notes", label: "Lecture notes" },
+  { value: "textbook", label: "Textbook chapter" },
+  { value: "slides", label: "Slides" },
+  { value: "study_guide", label: "Study guide" },
   { value: "other", label: "Other" },
 ];
 
@@ -53,6 +55,7 @@ function formatDate(iso) {
 }
 
 export default function DocumentsPanel({ open, onClose, onDocumentsChanged }) {
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -178,7 +181,7 @@ export default function DocumentsPanel({ open, onClose, onDocumentsChanged }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <label
               htmlFor="doc-type-select"
               className="text-xs font-medium"
@@ -357,6 +360,18 @@ export default function DocumentsPanel({ open, onClose, onDocumentsChanged }) {
                         {doc.doc_type} · {formatDate(doc.uploaded_at)}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        navigate(`/app/study/${doc.id}`);
+                      }}
+                      className="flex-shrink-0 rounded-md p-1.5 hover:bg-[var(--color-surface)]"
+                      aria-label={`Study tools for ${doc.filename}`}
+                      title="Study tools"
+                    >
+                      <GraduationCap size={15} style={{ color: "var(--color-text-muted)" }} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setPendingDelete(doc)}

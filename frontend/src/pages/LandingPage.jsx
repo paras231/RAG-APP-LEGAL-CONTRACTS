@@ -1,122 +1,175 @@
 import {
-  BookText,
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  Brain,
+  GraduationCap,
+  ListChecks,
+  Loader2,
   MoonStar,
-  ScanSearch,
-  Scale,
-  ShieldCheck,
+  Sparkles,
   Sun,
+  Timer,
   UploadCloud,
-  Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 const FEATURES = [
   {
-    icon: ScanSearch,
-    title: "Grounded, hybrid retrieval",
+    icon: Brain,
+    title: "Ask your notes anything",
     description:
-      "Semantic vector search fused with full-text search finds the exact clause, term, or citation — not just the vibe of your question.",
+      "Hybrid semantic + keyword search finds the exact passage in your notes, so answers are grounded — not guessed.",
   },
   {
-    icon: BookText,
-    title: "Citation-backed answers",
+    icon: ListChecks,
+    title: "Flashcards, quizzes & tests",
     description:
-      "Every answer traces back to the source document and section, so you can verify it in seconds, not minutes.",
+      "Auto-generate flashcards, summaries, key points, quizzes, and timed tests from any document in one click.",
   },
   {
     icon: UploadCloud,
     title: "Drop in PDFs & DOCX",
     description:
-      "Upload contracts, statutes, or policies. Legal-structure-aware chunking keeps Articles and Sections intact.",
+      "Upload lecture notes, slides, or textbook chapters. Heading-aware chunking keeps chapters and sections intact.",
   },
   {
-    icon: ShieldCheck,
-    title: "Private by default",
+    icon: Timer,
+    title: "Track your progress",
     description:
-      "Chat history stays in your browser's local storage only — nothing is stored server-side beyond your documents.",
+      "Every quiz and test attempt is saved to your account, so you can see how your understanding improves over time.",
   },
 ];
 
 const STEPS = [
-  { step: "01", title: "Upload", description: "Add your PDF or DOCX documents in seconds." },
-  { step: "02", title: "Ask", description: "Ask questions in plain language, like chatting with a colleague." },
-  { step: "03", title: "Verify", description: "Get grounded answers with citations back to the source text." },
+  { step: "01", title: "Upload", description: "Add your PDF or DOCX notes in seconds." },
+  { step: "02", title: "Study", description: "Chat, generate flashcards, summaries, and key points." },
+  { step: "03", title: "Test yourself", description: "Take an auto-generated quiz or timed test and track your score." },
 ];
 
 export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
+  const { continueAsGuest } = useAuth();
+  const navigate = useNavigate();
+  const [isTrying, setIsTrying] = useState(false);
+  const [tryError, setTryError] = useState(null);
+
+  const handleTryIt = async () => {
+    setTryError(null);
+    setIsTrying(true);
+    try {
+      await continueAsGuest();
+      navigate("/app");
+    } catch (err) {
+      setTryError(err.message || "Could not start a guest session.");
+    } finally {
+      setIsTrying(false);
+    }
+  };
 
   return (
     <div style={{ backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}>
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-8">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <span
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-accent-contrast)",
-            }}
+            className="brand-gradient flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+            style={{ color: "var(--color-accent-contrast)" }}
           >
-            C
+            <GraduationCap size={17} />
           </span>
-          Counsel
+          <span className="hidden sm:inline">StudyMate</span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded-md p-2 hover:bg-[var(--color-surface)]"
+            className="flex-shrink-0 rounded-md p-2 hover:bg-[var(--color-surface)]"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? <Sun size={18} /> : <MoonStar size={18} />}
           </button>
           <Link
-            to="/app"
-            className="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-accent-contrast)",
-            }}
+            to="/login"
+            className="flex-shrink-0 rounded-md px-2.5 py-2 text-sm font-medium hover:bg-[var(--color-surface)] sm:px-3"
           >
-            Launch app
+            Sign in
+          </Link>
+          <Link
+            to="/signup"
+            className="brand-gradient flex-shrink-0 rounded-lg px-3 py-2 text-sm font-medium shadow-sm transition-transform hover:scale-[1.03] sm:px-4"
+            style={{ color: "var(--color-accent-contrast)" }}
+          >
+            Get started
           </Link>
         </div>
       </header>
 
-      <section className="mx-auto max-w-4xl px-5 pb-20 pt-14 text-center sm:px-8 sm:pt-20">
+      <div className="relative overflow-hidden">
         <div
-          className="mx-auto mb-5 flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-        >
-          <Zap size={13} style={{ color: "var(--color-accent)" }} />
-          Retrieval-augmented, not hallucinated
-        </div>
-        <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-          Ask your documents.
-          <br />
-          Get answers you can cite.
-        </h1>
-        <p
-          className="mx-auto mt-5 max-w-xl text-base sm:text-lg"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          Upload contracts, statutes, or policies and chat with them directly.
-          Every answer is grounded in your source text — no guessing.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link
-            to="/app"
-            className="w-full rounded-lg px-6 py-3 text-sm font-semibold transition-transform hover:scale-[1.02] sm:w-auto"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-accent-contrast)",
-            }}
+          className="blob -left-24 -top-24 h-72 w-72"
+          style={{ backgroundColor: "var(--color-accent)" }}
+          aria-hidden="true"
+        />
+        <div
+          className="blob -right-16 top-10 h-80 w-80"
+          style={{ backgroundColor: "var(--color-accent-2)", animationDelay: "-6s" }}
+          aria-hidden="true"
+        />
+
+        <section className="relative mx-auto max-w-4xl px-5 pb-20 pt-14 text-center sm:px-8 sm:pt-20">
+          <div className="ai-badge mx-auto mb-5 w-fit">
+            <Sparkles size={13} />
+            AI-powered study assistant
+          </div>
+          <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
+            Turn your notes into
+            <br />
+            <span className="brand-gradient-text">flashcards, quizzes &amp; answers.</span>
+          </h1>
+          <p
+            className="mx-auto mt-5 max-w-xl text-base sm:text-lg"
+            style={{ color: "var(--color-text-muted)" }}
           >
-            Start chatting — it's free
-          </Link>
-        </div>
-      </section>
+            Upload your PDF or DOCX notes and chat with them directly. Get instant
+            summaries, key points, flashcards, and quizzes — all grounded in your
+            own material.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to="/signup"
+              className="brand-glow brand-gradient w-full rounded-lg px-6 py-3 text-sm font-semibold transition-transform hover:scale-[1.02] sm:w-auto"
+              style={{ color: "var(--color-accent-contrast)" }}
+            >
+              Start studying — it's free
+            </Link>
+            <button
+              type="button"
+              onClick={handleTryIt}
+              disabled={isTrying}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border px-6 py-3 text-sm font-semibold transition-colors hover:bg-[var(--color-surface)] disabled:opacity-60 sm:w-auto"
+              style={{ borderColor: "var(--color-border)" }}
+            >
+              {isTrying ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
+              Try it — no signup
+            </button>
+          </div>
+          {tryError && (
+            <p
+              className="mt-3 flex items-center justify-center gap-1.5 text-sm"
+              style={{ color: "var(--color-danger)" }}
+            >
+              <AlertCircle size={14} />
+              {tryError}
+            </p>
+          )}
+          <p className="mt-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+            No account needed to try it — sign up any time to save your chat and progress.
+          </p>
+        </section>
+      </div>
 
       <section
         className="border-y"
@@ -124,12 +177,16 @@ export default function LandingPage() {
       >
         <div className="mx-auto grid max-w-6xl gap-px px-5 py-14 sm:px-8 md:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="flex flex-col gap-3 p-4">
+            <div
+              key={title}
+              className="card-elevated flex flex-col gap-3 rounded-2xl p-4"
+              style={{ backgroundColor: "var(--color-bg-elevated)" }}
+            >
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-lg"
-                style={{ backgroundColor: "var(--color-surface)" }}
+                className="brand-gradient flex h-10 w-10 items-center justify-center rounded-lg"
+                style={{ color: "var(--color-accent-contrast)" }}
               >
-                <Icon size={19} style={{ color: "var(--color-accent)" }} />
+                <Icon size={19} />
               </div>
               <h3 className="text-sm font-semibold">{title}</h3>
               <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
@@ -142,17 +199,12 @@ export default function LandingPage() {
 
       <section className="mx-auto max-w-5xl px-5 py-20 sm:px-8">
         <h2 className="text-center text-2xl font-semibold sm:text-3xl">
-          Three steps to grounded answers
+          Three steps to studying smarter
         </h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
           {STEPS.map(({ step, title, description }) => (
             <div key={step} className="text-center sm:text-left">
-              <span
-                className="text-sm font-semibold"
-                style={{ color: "var(--color-accent)" }}
-              >
-                {step}
-              </span>
+              <span className="brand-gradient-text text-sm font-bold">{step}</span>
               <h3 className="mt-2 text-lg font-semibold">{title}</h3>
               <p className="mt-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
                 {description}
@@ -167,19 +219,21 @@ export default function LandingPage() {
         style={{ borderColor: "var(--color-border)" }}
       >
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-5 px-5 py-20 text-center sm:px-8">
-          <Scale size={32} style={{ color: "var(--color-accent)" }} />
+          <span
+            className="brand-gradient flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ color: "var(--color-accent-contrast)" }}
+          >
+            <BookOpen size={26} />
+          </span>
           <h2 className="text-2xl font-semibold sm:text-3xl">
-            Stop searching. Start asking.
+            Stop re-reading. Start recalling.
           </h2>
           <Link
-            to="/app"
-            className="rounded-lg px-6 py-3 text-sm font-semibold"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-accent-contrast)",
-            }}
+            to="/signup"
+            className="brand-glow brand-gradient rounded-lg px-6 py-3 text-sm font-semibold transition-transform hover:scale-[1.02]"
+            style={{ color: "var(--color-accent-contrast)" }}
           >
-            Launch the app
+            Create your free account
           </Link>
         </div>
       </section>
@@ -188,7 +242,7 @@ export default function LandingPage() {
         className="border-t px-5 py-6 text-center text-xs sm:px-8"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
       >
-        Built for document-grounded conversations. Chat history stays in your browser.
+        Built for students who'd rather understand than re-read.
       </footer>
     </div>
   );
