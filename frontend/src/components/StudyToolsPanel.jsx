@@ -7,17 +7,17 @@ import {
   Plus,
   Sparkles,
   Timer,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 import { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import AssessmentRunner from "../components/AssessmentRunner.jsx";
-import FlashcardViewer from "../components/FlashcardViewer.jsx";
+import AssessmentRunner from "./AssessmentRunner.jsx";
+import FlashcardViewer from "./FlashcardViewer.jsx";
 import * as api from "../lib/api.js";
 import { validateIntInRange } from "../lib/validators.js";
 
-const TABS = [
+export const TABS = [
   { id: "summary", label: "Summary", icon: BookOpen },
   { id: "keypoints", label: "Key points", icon: Sparkles },
   { id: "flashcards", label: "Flashcards", icon: Layers },
@@ -493,42 +493,51 @@ function EmptyHint({ text }) {
   );
 }
 
-export default function StudyToolsPage() {
-  const { documentId } = useParams();
-  const navigate = useNavigate();
-  const [documentName, setDocumentName] = useState(null);
-  const [tab, setTab] = useState("summary");
+/** Slide-over drawer, docked to the right edge of the viewport, so study
+ * tools stay attached to the chat instead of navigating to a separate page. */
+export default function StudyToolsPanel({ open, documentId, documentName, initialTab, onClose }) {
+  const [tab, setTab] = useState(initialTab ?? "summary");
 
   useEffect(() => {
-    api
-      .listDocuments()
-      .then((docs) => {
-        const doc = docs.find((d) => d.id === documentId);
-        setDocumentName(doc?.filename ?? null);
-      })
-      .catch(() => {});
-  }, [documentId]);
+    if (open && initialTab) setTab(initialTab);
+  }, [open, initialTab]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   return (
-    <div className="mx-auto flex h-dvh max-w-3xl flex-col" style={{ backgroundColor: "var(--color-bg)" }}>
+    <div
+      className={clsx(
+        "fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l shadow-xl transition-transform duration-200 sm:w-[26rem]",
+        open ? "translate-x-0" : "translate-x-full",
+      )}
+      style={{ backgroundColor: "var(--color-bg)", borderColor: "var(--color-border)" }}
+      aria-hidden={!open}
+    >
       <header
         className="flex items-center gap-3 border-b px-4 py-3"
         style={{ borderColor: "var(--color-border)" }}
       >
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
+            Study tools
+          </p>
+          <p className="truncate text-sm font-semibold">{documentName ?? "Select a document"}</p>
+        </div>
         <button
           type="button"
-          onClick={() => navigate(-1)}
-          className="rounded-md p-1.5 hover:bg-[var(--color-surface)]"
-          aria-label="Back"
+          onClick={onClose}
+          className="flex-shrink-0 rounded-md p-1.5 hover:bg-[var(--color-surface)]"
+          aria-label="Close study tools"
         >
-          <ArrowLeft size={18} />
+          <X size={18} />
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{documentName ?? "Study tools"}</p>
-          <Link to="/app" className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Back to chat
-          </Link>
-        </div>
       </header>
 
       <nav className="flex gap-1 overflow-x-auto border-b px-3 py-2" style={{ borderColor: "var(--color-border)" }}>
@@ -538,11 +547,11 @@ export default function StudyToolsPage() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4">
-        {tab === "summary" && <SummaryTab documentId={documentId} />}
-        {tab === "keypoints" && <KeypointsTab documentId={documentId} />}
-        {tab === "flashcards" && <FlashcardsTab documentId={documentId} />}
-        {tab === "quiz" && <AssessmentTab documentId={documentId} kind="quiz" />}
-        {tab === "test" && <AssessmentTab documentId={documentId} kind="test" />}
+        {documentId && tab === "summary" && <SummaryTab documentId={documentId} />}
+        {documentId && tab === "keypoints" && <KeypointsTab documentId={documentId} />}
+        {documentId && tab === "flashcards" && <FlashcardsTab documentId={documentId} />}
+        {documentId && tab === "quiz" && <AssessmentTab documentId={documentId} kind="quiz" />}
+        {documentId && tab === "test" && <AssessmentTab documentId={documentId} kind="test" />}
       </main>
     </div>
   );

@@ -1,4 +1,3 @@
-import { GraduationCap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Composer from "../components/Composer.jsx";
@@ -9,6 +8,8 @@ import EmptyState from "../components/EmptyState.jsx";
 import MessageBubble from "../components/MessageBubble.jsx";
 import SaveProgressDialog from "../components/SaveProgressDialog.jsx";
 import Sidebar, { SidebarToggleButton } from "../components/Sidebar.jsx";
+import StudyToolsDock from "../components/StudyToolsDock.jsx";
+import StudyToolsPanel from "../components/StudyToolsPanel.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useChats } from "../hooks/useChats.js";
 import { listDocuments, sendChatMessage } from "../lib/api.js";
@@ -42,6 +43,8 @@ export default function ChatApp() {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const [selectedDocumentLabel, setSelectedDocumentLabel] = useState(null);
+  const [isStudyPanelOpen, setIsStudyPanelOpen] = useState(false);
+  const [studyTab, setStudyTab] = useState("summary");
   const abortRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -52,6 +55,10 @@ export default function ChatApp() {
   useEffect(() => {
     if (chatId !== activeChatId) setActiveChatId(chatId ?? null);
   }, [chatId, activeChatId, setActiveChatId]);
+
+  useEffect(() => {
+    setIsStudyPanelOpen(false);
+  }, [chatId]);
 
   // A document pin is a per-visit convenience, not persisted server-side.
   // Default it once per chat, after both the document list and this chat's
@@ -207,19 +214,6 @@ export default function ChatApp() {
               setSelectedDocumentLabel(label);
             }}
           />
-          {selectedDocumentId && (
-            <button
-              type="button"
-              onClick={() => navigate(`/app/study/${selectedDocumentId}`)}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--color-surface)] sm:px-2.5"
-              style={{ borderColor: "var(--color-border)" }}
-              aria-label={`Study tools for ${selectedDocumentLabel}`}
-              title={`Study tools for ${selectedDocumentLabel}`}
-            >
-              <GraduationCap size={13} />
-              <span className="hidden sm:inline">Study tools</span>
-            </button>
-          )}
         </header>
 
         <main ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -254,10 +248,29 @@ export default function ChatApp() {
         />
       </div>
 
+      <StudyToolsDock
+        hidden={!selectedDocumentId || isStudyPanelOpen}
+        onOpenTool={(tab) => {
+          setStudyTab(tab);
+          setIsStudyPanelOpen(true);
+        }}
+      />
+      <StudyToolsPanel
+        open={isStudyPanelOpen}
+        documentId={selectedDocumentId}
+        documentName={selectedDocumentLabel}
+        initialTab={studyTab}
+        onClose={() => setIsStudyPanelOpen(false)}
+      />
+
       <DocumentsPanel
         open={isDocumentsOpen}
         onClose={() => setIsDocumentsOpen(false)}
         onDocumentsChanged={handleDocumentsChanged}
+        onSelectDocument={(doc) => {
+          setSelectedDocumentId(doc.id);
+          setSelectedDocumentLabel(doc.filename);
+        }}
       />
 
       <ConfirmDialog

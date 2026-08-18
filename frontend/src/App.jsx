@@ -4,7 +4,6 @@ import LandingPage from "./pages/LandingPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupPage from "./pages/SignupPage.jsx";
 import ChatApp from "./pages/ChatApp.jsx";
-import StudyToolsPage from "./pages/StudyToolsPage.jsx";
 
 export default function App() {
   return (
@@ -15,7 +14,6 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/app" element={<ChatApp />} />
         <Route path="/app/:chatId" element={<ChatApp />} />
-        <Route path="/app/study/:documentId" element={<StudyToolsPage />} />
       </Route>
     </Routes>
   );

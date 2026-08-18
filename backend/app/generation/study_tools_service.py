@@ -14,6 +14,7 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
 from app.db.models import (
@@ -144,8 +145,16 @@ class StudyToolsService:
             )
 
         await self._session.commit()
-        await self._session.refresh(flashcard_set)
-        return flashcard_set
+
+        # A plain refresh() only reloads column attributes, not relationships —
+        # FastAPI's response model needs `.flashcards` eagerly loaded, or
+        # serializing it later triggers a lazy load outside the async context.
+        result = await self._session.execute(
+            select(FlashcardSet)
+            .options(selectinload(FlashcardSet.flashcards))
+            .where(FlashcardSet.id == flashcard_set.id)
+        )
+        return result.scalar_one()
 
     async def generate_assessment(
         self,
@@ -194,8 +203,13 @@ class StudyToolsService:
             )
 
         await self._session.commit()
-        await self._session.refresh(assessment)
-        return assessment
+
+        result = await self._session.execute(
+            select(Assessment)
+            .options(selectinload(Assessment.questions))
+            .where(Assessment.id == assessment.id)
+        )
+        return result.scalar_one()
 
     async def submit_attempt(
         self, assessment_id: str, user_id: str, answers: dict[str, str]

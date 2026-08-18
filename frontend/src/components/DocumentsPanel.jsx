@@ -2,14 +2,13 @@ import {
   AlertCircle,
   CheckCircle2,
   File as FileIcon,
-  GraduationCap,
+  MessageSquare,
   Loader2,
   Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { deleteDocument, listDocuments, uploadDocument } from "../lib/api.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 
@@ -54,8 +53,7 @@ function formatDate(iso) {
   }
 }
 
-export default function DocumentsPanel({ open, onClose, onDocumentsChanged }) {
-  const navigate = useNavigate();
+export default function DocumentsPanel({ open, onClose, onDocumentsChanged, onSelectDocument }) {
   const [documents, setDocuments] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -363,14 +361,14 @@ export default function DocumentsPanel({ open, onClose, onDocumentsChanged }) {
                     <button
                       type="button"
                       onClick={() => {
+                        onSelectDocument?.(doc);
                         onClose();
-                        navigate(`/app/study/${doc.id}`);
                       }}
                       className="flex-shrink-0 rounded-md p-1.5 hover:bg-[var(--color-surface)]"
-                      aria-label={`Study tools for ${doc.filename}`}
-                      title="Study tools"
+                      aria-label={`Chat and use study tools with ${doc.filename}`}
+                      title="Use in chat"
                     >
-                      <GraduationCap size={15} style={{ color: "var(--color-text-muted)" }} />
+                      <MessageSquare size={15} style={{ color: "var(--color-text-muted)" }} />
                     </button>
                     <button
                       type="button"
