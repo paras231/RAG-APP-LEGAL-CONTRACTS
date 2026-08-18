@@ -1,6 +1,6 @@
 import { getToken } from "./authToken.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const API_BASE = "https://rag-app-legal-contracts.onrender.com" ?? "/api";
 
 class ApiError extends Error {
   constructor(message, status) {
@@ -137,7 +137,11 @@ export async function uploadDocument(file, docType, onProgress) {
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", url.pathname + url.search);
+    // Use the full URL, not just pathname+search — API_BASE is an absolute
+    // origin in production (no dev-server proxy once this is a static
+    // build), and stripping the origin here would silently send the
+    // request to the frontend's own domain instead of the API.
+    xhr.open("POST", url.toString());
     const token = getToken();
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.upload.onprogress = (e) => {
